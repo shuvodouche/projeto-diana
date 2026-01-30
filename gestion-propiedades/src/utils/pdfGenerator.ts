@@ -1,4 +1,4 @@
-// src/utils/pdfGenerator.ts - VERSÃO SEM ERROS
+// src/utils/pdfGenerator.ts - VERSÃO ORGANIZADA
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -10,37 +10,59 @@ const formatNumber = (num: number) => {
   }).format(num)
 }
 
+// Configurações gerais do PDF
+const PDF_CONFIG = {
+  MARGIN_LEFT: 15,
+  MARGIN_RIGHT: 15,
+  PAGE_WIDTH: 210, // A4 em mm
+  MAX_TABLE_WIDTH: 180,
+  FONT_SIZES: {
+    TITLE: 16,
+    SUBTITLE: 12,
+    BODY: 10,
+    SMALL: 8
+  }
+}
+
 // Função principal - PDF de reporte individual
 export const generarPDFReporte = (datos: any) => {
   try {
     const doc = new jsPDF()
-    
+    const pageWidth = PDF_CONFIG.PAGE_WIDTH
+    const marginLeft = PDF_CONFIG.MARGIN_LEFT
+    const marginRight = PDF_CONFIG.MARGIN_RIGHT
+    const maxTableWidth = pageWidth - marginLeft - marginRight
+
     // TÍTULO
-    doc.setFontSize(20)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.TITLE)
     doc.setTextColor(45, 55, 72)
     doc.setFont('helvetica', 'bold')
-    doc.text('REPORTE MENSUAL', 105, 25, { align: 'center' })
+    doc.text('REPORTE MENSUAL', pageWidth / 2, 25, { align: 'center' })
     
     // Linha decorativa
     doc.setDrawColor(77, 171, 247)
     doc.setLineWidth(0.5)
-    doc.line(20, 32, 190, 32)
+    doc.line(marginLeft, 32, pageWidth - marginLeft, 32)
     
     // INFORMACIÓN BÁSICA
-    doc.setFontSize(11)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY)
     doc.setTextColor(73, 80, 87)
     doc.setFont('helvetica', 'normal')
     
-    doc.text(`Propiedad: ${datos.propiedad}`, 20, 45)
-    doc.text(`Propietario: ${datos.propietario}`, 20, 53)
-    doc.text(`Mes: ${datos.mes}`, 20, 61)
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-BO')}`, 20, 69)
+    // Informação em duas colunas para economizar espaço
+    const col1X = marginLeft
+    const col2X = pageWidth / 2
+    
+    doc.text(`Propiedad: ${datos.propiedad}`, col1X, 45)
+    doc.text(`Propietario: ${datos.propietario}`, col1X, 52)
+    doc.text(`Mes: ${datos.mes}`, col2X, 45)
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-BO')}`, col2X, 52)
     
     // ESTADÍSTICAS
-    doc.setFontSize(12)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SUBTITLE)
     doc.setTextColor(45, 55, 72)
     doc.setFont('helvetica', 'bold')
-    doc.text('Estadísticas de Ocupación', 20, 85)
+    doc.text('Estadísticas de Ocupación', marginLeft, 65)
     
     // Tabla simple de estadísticas
     const statsData = [
@@ -50,26 +72,27 @@ export const generarPDFReporte = (datos: any) => {
     ]
     
     autoTable(doc, {
-      startY: 90,
+      startY: 70,
       body: statsData,
       theme: 'plain',
       styles: {
-        fontSize: 10,
-        cellPadding: 5,
+        fontSize: PDF_CONFIG.FONT_SIZES.BODY,
+        cellPadding: 4,
         textColor: [73, 80, 87]
       },
       columnStyles: {
-        0: { cellWidth: 100, fontStyle: 'bold' },
-        1: { cellWidth: 90, halign: 'right' }
+        0: { cellWidth: maxTableWidth * 0.6, fontStyle: 'bold' },
+        1: { cellWidth: maxTableWidth * 0.4, halign: 'right' }
       },
-      margin: { left: 20 }
+      margin: { left: marginLeft, right: marginRight },
+      tableWidth: maxTableWidth
     })
     
     // RESUMEN FINANCIERO - TABLA PRINCIPAL
-    const financeStartY = (doc as any).lastAutoTable.finalY + 15
+    const financeStartY = (doc as any).lastAutoTable.finalY + 10
     
-    doc.setFontSize(12)
-    doc.text('Resumen Financiero', 20, financeStartY)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SUBTITLE)
+    doc.text('Resumen Financiero', marginLeft, financeStartY)
     
     const financeData = [
       ['INGRESO TOTAL', `Bs ${formatNumber(datos.ingresoTotal)}`],
@@ -87,19 +110,20 @@ export const generarPDFReporte = (datos: any) => {
         fillColor: [45, 55, 72],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 10,
-        cellPadding: 6,
+        fontSize: PDF_CONFIG.FONT_SIZES.BODY,
+        cellPadding: 5,
       },
       styles: {
-        fontSize: 10,
-        cellPadding: 5,
+        fontSize: PDF_CONFIG.FONT_SIZES.BODY,
+        cellPadding: 4,
         textColor: [73, 80, 87]
       },
       columnStyles: {
-        0: { cellWidth: 120, fontStyle: 'bold' },
-        1: { cellWidth: 70, halign: 'right' }
+        0: { cellWidth: maxTableWidth * 0.7, fontStyle: 'bold' },
+        1: { cellWidth: maxTableWidth * 0.3, halign: 'right' }
       },
-      margin: { left: 20, right: 20 },
+      margin: { left: marginLeft, right: marginRight },
+      tableWidth: maxTableWidth,
       // Colorir as linhas manualmente
       didParseCell: function(data: any) {
         if (data.row.index === 0) { // Ingreso
@@ -111,20 +135,20 @@ export const generarPDFReporte = (datos: any) => {
         if (data.row.index === 3) { // Neto
           data.cell.styles.fontStyle = 'bold'
           data.cell.styles.textColor = [39, 174, 96]
-          data.cell.styles.fontSize = 11
+          data.cell.styles.fontSize = PDF_CONFIG.FONT_SIZES.BODY + 1
         }
       }
     })
     
     // GASTOS DETALLADOS (si hay)
     if (datos.gastos && datos.gastos.length > 0) {
-      const expensesY = (doc as any).lastAutoTable.finalY + 15
+      const expensesY = (doc as any).lastAutoTable.finalY + 10
       
-      doc.setFontSize(12)
-      doc.text('Detalle de Gastos', 20, expensesY)
+      doc.setFontSize(PDF_CONFIG.FONT_SIZES.SUBTITLE)
+      doc.text('Detalle de Gastos', marginLeft, expensesY)
       
       const gastosTable = datos.gastos.map((g: any) => [
-        g.concepto,
+        g.concepto.length > 40 ? g.concepto.substring(0, 40) + '...' : g.concepto,
         `- Bs ${formatNumber(g.monto)}`
       ])
       
@@ -137,30 +161,31 @@ export const generarPDFReporte = (datos: any) => {
           fillColor: [241, 196, 15],
           textColor: [0, 0, 0],
           fontStyle: 'bold',
-          fontSize: 9,
+          fontSize: PDF_CONFIG.FONT_SIZES.BODY - 1,
         },
         styles: {
-          fontSize: 9,
-          cellPadding: 4,
+          fontSize: PDF_CONFIG.FONT_SIZES.SMALL,
+          cellPadding: 3,
         },
         columnStyles: {
-          0: { cellWidth: 140 },
-          1: { cellWidth: 50, halign: 'right', textColor: [231, 76, 60] }
+          0: { cellWidth: maxTableWidth * 0.75 },
+          1: { cellWidth: maxTableWidth * 0.25, halign: 'right', textColor: [231, 76, 60] }
         },
-        margin: { left: 20, right: 20 }
+        margin: { left: marginLeft, right: marginRight },
+        tableWidth: maxTableWidth
       })
     }
     
     // OBSERVACIONES
     let notesY = (doc as any).lastAutoTable?.finalY || financeStartY + 100
-    notesY += 15
+    notesY += 10
     
-    doc.setFontSize(11)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY)
     doc.setTextColor(230, 126, 34)
     doc.setFont('helvetica', 'bold')
-    doc.text('Observaciones', 20, notesY)
+    doc.text('Observaciones', marginLeft, notesY)
     
-    doc.setFontSize(9)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SMALL)
     doc.setTextColor(92, 60, 0)
     doc.setFont('helvetica', 'normal')
     
@@ -172,19 +197,20 @@ export const generarPDFReporte = (datos: any) => {
     ]
     
     observaciones.forEach((obs, index) => {
-      doc.text(obs, 25, notesY + 10 + (index * 6))
+      // Quebrar linhas muito longas
+      const lines = doc.splitTextToSize(obs, maxTableWidth - 10)
+      lines.forEach((line: string, lineIndex: number) => {
+        doc.text(line, marginLeft + 5, notesY + 8 + (index * 5) + (lineIndex * 4))
+      })
     })
     
     // PIE DE PÁGINA SIMPLE
-    const totalPages = (doc.internal as any).getNumberOfPages()
-    const currentPage = 1 // Para single page
-    
-    doc.setFontSize(8)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SMALL)
     doc.setTextColor(153, 153, 153)
     doc.setFont('helvetica', 'italic')
     doc.text(
-      `Sistema de Gestión de Propiedades • Página ${currentPage} de ${totalPages}`,
-      105,
+      'Sistema de Gestión de Propiedades • Página 1 de 1',
+      pageWidth / 2,
       285,
       { align: 'center' }
     )
@@ -207,44 +233,63 @@ export const generarPDFReporte = (datos: any) => {
 export const generarTodosReportes = (propiedades: any[], mes: string, propietarios: any[]) => {
   try {
     const doc = new jsPDF()
+    const pageWidth = PDF_CONFIG.PAGE_WIDTH
+    const marginLeft = PDF_CONFIG.MARGIN_LEFT
+    const marginRight = PDF_CONFIG.MARGIN_RIGHT
+    const maxTableWidth = pageWidth - marginLeft - marginRight
     
     // TÍTULO
-    doc.setFontSize(18)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.TITLE - 2)
     doc.setTextColor(45, 55, 72)
     doc.setFont('helvetica', 'bold')
-    doc.text('RESUMEN DE REPORTES MENSUALES', 105, 20, { align: 'center' })
+    doc.text('RESUMEN DE REPORTES MENSUALES', pageWidth / 2, 20, { align: 'center' })
     
     // SUBTÍTULO
-    doc.setFontSize(12)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SUBTITLE)
     doc.setTextColor(77, 171, 247)
-    doc.text(mes, 105, 28, { align: 'center' })
+    doc.text(mes, pageWidth / 2, 28, { align: 'center' })
     
     // LÍNEA
     doc.setDrawColor(77, 171, 247)
     doc.setLineWidth(0.5)
-    doc.line(20, 33, 190, 33)
+    doc.line(marginLeft, 33, pageWidth - marginLeft, 33)
     
     // INFORMACIÓN
-    doc.setFontSize(10)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY)
     doc.setTextColor(73, 80, 87)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Total propiedades: ${propiedades.length}`, 20, 45)
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-BO')}`, 20, 52)
+    doc.text(`Total propiedades: ${propiedades.length}`, marginLeft, 45)
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-BO')}`, marginLeft, 52)
     
     // PREPARAR DATOS - SIN IDs
     const tableData = propiedades.map((prop, index) => {
       const propietario = propietarios.find(p => p.id === prop.propietarioId)
+      // Truncar nombres muito longos
+      const nombrePropietario = propietario?.nombre || 'No asignado'
+      const nombreTruncado = nombrePropietario.length > 25 
+        ? nombrePropietario.substring(0, 22) + '...' 
+        : nombrePropietario
+        
       return [
         (index + 1).toString(),
         `APTO ${prop.numero}`,
         prop.tipo,
-        propietario?.nombre || 'No asignado',
+        nombreTruncado,
         `Bs ${formatNumber(prop.precioNoche || 0)}`,
         prop.estado
       ]
     })
     
-    // TABLA PRINCIPAL
+    // TABLA PRINCIPAL - com larguras proporcionais
+    const columnWidths = [
+      maxTableWidth * 0.05,  // #
+      maxTableWidth * 0.15,  // APTO
+      maxTableWidth * 0.20,  // TIPO
+      maxTableWidth * 0.25,  // PROPIETARIO
+      maxTableWidth * 0.20,  // PRECIO/NOCHE
+      maxTableWidth * 0.15,  // ESTADO
+    ]
+    
     autoTable(doc, {
       startY: 60,
       head: [['#', 'APARTAMENTO', 'TIPO', 'PROPIETARIO', 'PRECIO/NOCHE', 'ESTADO']],
@@ -254,23 +299,26 @@ export const generarTodosReportes = (propiedades: any[], mes: string, propietari
         fillColor: [45, 55, 72],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 9,
+        fontSize: PDF_CONFIG.FONT_SIZES.BODY - 1,
+        cellPadding: 3,
       },
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        fontSize: PDF_CONFIG.FONT_SIZES.SMALL,
+        cellPadding: 2,
         textColor: [73, 80, 87],
-        overflow: 'linebreak'
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
       },
       columnStyles: {
-        0: { cellWidth: 15, halign: 'center' },
-        1: { cellWidth: 35, halign: 'center' },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 50 },
-        4: { cellWidth: 35, halign: 'right' },
-        5: { cellWidth: 25, halign: 'center' }
+        0: { cellWidth: columnWidths[0], halign: 'center' },
+        1: { cellWidth: columnWidths[1], halign: 'center' },
+        2: { cellWidth: columnWidths[2] },
+        3: { cellWidth: columnWidths[3] },
+        4: { cellWidth: columnWidths[4], halign: 'right' },
+        5: { cellWidth: columnWidths[5], halign: 'center' }
       },
-      margin: { left: 15, right: 15 },
+      margin: { left: marginLeft, right: marginRight },
+      tableWidth: maxTableWidth,
       // Colorir estados
       didParseCell: function(data: any) {
         if (data.column.index === 5) { // Columna ESTADO
@@ -292,12 +340,12 @@ export const generarTodosReportes = (propiedades: any[], mes: string, propietari
     // NOTA IMPORTANTE
     const finalY = (doc as any).lastAutoTable.finalY + 10
     
-    doc.setFontSize(10)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY)
     doc.setTextColor(230, 126, 34)
     doc.setFont('helvetica', 'bold')
-    doc.text('Nota Importante', 20, finalY)
+    doc.text('Nota Importante', marginLeft, finalY)
     
-    doc.setFontSize(8)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SMALL)
     doc.setTextColor(92, 60, 0)
     doc.setFont('helvetica', 'normal')
     
@@ -308,22 +356,22 @@ export const generarTodosReportes = (propiedades: any[], mes: string, propietari
     ]
     
     notas.forEach((nota, index) => {
-      doc.text(nota, 25, finalY + 7 + (index * 5))
+      doc.text(nota, marginLeft + 5, finalY + 7 + (index * 5))
     })
     
     // PIE DE PÁGINA
-    doc.setFontSize(8)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SMALL)
     doc.setTextColor(153, 153, 153)
     doc.setFont('helvetica', 'italic')
     doc.text(
       `Resumen generado automáticamente • ${new Date().toLocaleDateString('es-BO')}`,
-      105,
+      pageWidth / 2,
       285,
       { align: 'center' }
     )
     
     // SALVAR
-    doc.save(`Resumen_General_${mes}.pdf`)
+    doc.save(`Resumen_General_${mes.replace(/\//g, '-')}.pdf`)
     
     return true
   } catch (error) {
@@ -337,31 +385,56 @@ export const generarTodosReportes = (propiedades: any[], mes: string, propietari
 export const generarPDFOcupacionDiaria = (ocupacion: any[], fecha: string, propiedades: any[]) => {
   try {
     const doc = new jsPDF('landscape')
+    const pageWidth = 297 // A4 landscape width
+    const marginLeft = PDF_CONFIG.MARGIN_LEFT
+    const marginRight = PDF_CONFIG.MARGIN_RIGHT
+    const maxTableWidth = pageWidth - marginLeft - marginRight
     
     // TÍTULO
-    doc.setFontSize(16)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.TITLE - 2)
     doc.setTextColor(45, 55, 72)
     doc.setFont('helvetica', 'bold')
-    doc.text('REPORTE DE OCUPACIÓN DIARIA', 148, 20, { align: 'center' })
+    doc.text('REPORTE DE OCUPACIÓN DIARIA', pageWidth / 2, 20, { align: 'center' })
     
-    doc.setFontSize(12)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SUBTITLE)
     doc.setTextColor(77, 171, 247)
-    doc.text(fecha, 148, 28, { align: 'center' })
+    doc.text(fecha, pageWidth / 2, 28, { align: 'center' })
     
     // PREPARAR DATOS
     const tableData = ocupacion.map(o => {
       const propiedad = propiedades.find(p => p.id === o.propiedadId)
+      // Truncar textos muito longos
+      const huesped = o.huesped && o.huesped.length > 25 
+        ? o.huesped.substring(0, 22) + '...' 
+        : (o.huesped || '-')
+        
+      const empresa = o.empresa && o.empresa.length > 20
+        ? o.empresa.substring(0, 17) + '...'
+        : (o.empresa || '-')
+      
       return [
         propiedad?.numero || 'N/A',
-        o.huesped || '-',
+        huesped,
         o.estado,
         o.entrada || '-',
         o.salida || '-',
-        o.empresa || '-',
+        empresa,
         `Bs ${formatNumber(o.precioNoche || 0)}`,
         o.pagado ? 'Sí' : 'No'
       ]
     })
+    
+    // Definir larguras proporcionais para landscape
+    const columnWidths = [
+      maxTableWidth * 0.06,  // APTO
+      maxTableWidth * 0.16,  // HUÉSPED
+      maxTableWidth * 0.10,  // ESTADO
+      maxTableWidth * 0.10,  // ENTRADA
+      maxTableWidth * 0.10,  // SALIDA
+      maxTableWidth * 0.13,  // EMPRESA
+      maxTableWidth * 0.12,  // PRECIO
+      maxTableWidth * 0.08,  // PAGADO
+    ]
     
     // TABLA
     autoTable(doc, {
@@ -373,24 +446,27 @@ export const generarPDFOcupacionDiaria = (ocupacion: any[], fecha: string, propi
         fillColor: [45, 55, 72],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 9,
+        fontSize: PDF_CONFIG.FONT_SIZES.BODY - 1,
+        cellPadding: 3,
       },
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
-        textColor: [73, 80, 87]
+        fontSize: PDF_CONFIG.FONT_SIZES.SMALL,
+        cellPadding: 2,
+        textColor: [73, 80, 87],
+        overflow: 'linebreak'
       },
       columnStyles: {
-        0: { cellWidth: 20, halign: 'center' },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 25, halign: 'center' },
-        3: { cellWidth: 22, halign: 'center' },
-        4: { cellWidth: 22, halign: 'center' },
-        5: { cellWidth: 30, halign: 'center' },
-        6: { cellWidth: 28, halign: 'right' },
-        7: { cellWidth: 22, halign: 'center' }
+        0: { cellWidth: columnWidths[0], halign: 'center' },
+        1: { cellWidth: columnWidths[1] },
+        2: { cellWidth: columnWidths[2], halign: 'center' },
+        3: { cellWidth: columnWidths[3], halign: 'center' },
+        4: { cellWidth: columnWidths[4], halign: 'center' },
+        5: { cellWidth: columnWidths[5], halign: 'center' },
+        6: { cellWidth: columnWidths[6], halign: 'right' },
+        7: { cellWidth: columnWidths[7], halign: 'center' }
       },
-      margin: { left: 15, right: 15 },
+      margin: { left: marginLeft, right: marginRight },
+      tableWidth: maxTableWidth,
       // Colorir estados
       didParseCell: function(data: any) {
         if (data.column.index === 2) { // Columna ESTADO
@@ -424,12 +500,12 @@ export const generarPDFOcupacionDiaria = (ocupacion: any[], fecha: string, propi
     
     const finalY = (doc as any).lastAutoTable.finalY + 10
     
-    doc.setFontSize(10)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY)
     doc.setTextColor(45, 55, 72)
     doc.setFont('helvetica', 'bold')
-    doc.text('Resumen:', 20, finalY)
+    doc.text('Resumen:', marginLeft, finalY)
     
-    doc.setFontSize(9)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.BODY - 1)
     doc.setTextColor(73, 80, 87)
     doc.setFont('helvetica', 'normal')
     
@@ -440,16 +516,16 @@ export const generarPDFOcupacionDiaria = (ocupacion: any[], fecha: string, propi
     ]
     
     stats.forEach((stat, index) => {
-      doc.text(stat, 25, finalY + 8 + (index * 6))
+      doc.text(stat, marginLeft + 5, finalY + 8 + (index * 6))
     })
     
     // PIE
-    doc.setFontSize(8)
+    doc.setFontSize(PDF_CONFIG.FONT_SIZES.SMALL)
     doc.setTextColor(153, 153, 153)
     doc.setFont('helvetica', 'italic')
     doc.text(
       `Reporte de ocupación diaria • ${new Date().toLocaleDateString('es-BO')}`,
-      148,
+      pageWidth / 2,
       190,
       { align: 'center' }
     )
